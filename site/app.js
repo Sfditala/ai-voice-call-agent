@@ -22,7 +22,7 @@
   function drawArch() {
     const box = $("arch");
     box.replaceChildren();
-    const groups = [["The conversation · ElevenLabs", ["caller", "voice", "llm", "kb"]], ["The actions · n8n over MCP", ["mcp", "save_lead", "notify_tala"]]];
+    const groups = [["The conversation · ElevenLabs", ["caller", "voice", "llm", "kb"]], ["The actions · n8n over MCP", ["mcp", "book_call", "sheet", "telegram"]]];
     for (const [title, ids] of groups) {
       box.append(el("div", { class: "arch-row-label" }, title));
       for (const id of ids) {
@@ -43,7 +43,11 @@
   function litFor(line) {
     if (line.who === "caller") return [["caller", "voice"]];
     if (line.who === "agent") return [line.kb ? ["voice", "llm", "kb"] : ["voice", "llm"]];
-    if (line.who === "tool") return [["llm", "mcp", line.tool], line.ok ? null : line.tool];
+    if (line.who === "tool") {
+      const old = P.retired?.[line.tool];
+      if (old) return [["llm", "mcp", old], line.ok ? null : old];
+      return [["llm", "mcp", line.tool, "sheet", "telegram"], line.fail || (line.ok ? null : line.tool)];
+    }
     return [[]];
   }
 
@@ -53,7 +57,7 @@
     box.replaceChildren();
     P.calls.forEach((c, idx) => {
       const b = el("button", { class: "sig-card", "aria-pressed": String(state.call === c), onclick: () => pick(idx, true) },
-        el("span", { class: "sig-label" }, c.label), el("span", { class: "sig-tag" }, c.tag));
+        el("span", { class: "sig-label", dir: "auto" }, c.label), el("span", { class: "sig-tag" }, c.tag));
       box.append(b);
     });
     let sum = document.querySelector(".call-summary");
@@ -95,11 +99,12 @@
       const meta = el("div", { class: "meta" }, line.who === "agent" ? "Agent" : "Caller");
       if (line.mood) meta.append(el("span", { class: "mood" }, line.mood));
       if (line.kb) meta.append(el("span", { class: "kbflag" }, "▤ from the CV"));
-      if (line.bad) meta.append(el("span", { class: "badflag" }, "✕ invented"));
+      if (line.bad) meta.append(el("span", { class: "badflag" }, line.who === "agent" && state.call.version === "v1" ? "✕ bug" : "✕ invented"));
       t.append(el("div", { class: `bubble ${line.who}${line.bad ? " bad" : ""}`, dir: "auto" }, meta, line.text));
       setStatus(line.who === "agent" ? "Speaking…" : "Listening…", line.who === "agent" ? "talking" : "listening");
     } else if (line.who === "tool") {
-      t.append(el("div", { class: `toolpill ${line.ok ? "ok" : "err"}` }, `⚙ ${line.tool} ${line.ok ? "✓" : "✕ failed"}`));
+      const v1 = P.retired?.[line.tool] ? " · v1" : "";
+      t.append(el("div", { class: `toolpill ${line.ok ? "ok" : "err"}` }, `⚙ ${line.tool}${v1} ${line.ok ? "✓" : "✕ failed"}`));
       setStatus(`Calling ${line.tool}…`, "");
       logEvent(line);
     } else if (line.who === "fix") {
@@ -114,7 +119,7 @@
     box.querySelector(".empty")?.remove();
     const ev = el("div", { class: `ev ${line.ok ? "ok" : "err"}` },
       el("div", { class: "ev-head" }, el("span", {}, `${mmss(line.t)} · ${line.tool}`), el("span", { class: "st" }, line.ok ? "success" : "error")),
-      el("pre", {}, `arguments ${JSON.stringify(line.args, null, 2)}\n\nresult    ${line.result}`),
+      el("pre", { dir: "auto" }, `arguments ${JSON.stringify(line.args, null, 2)}\n\nresult    ${line.result}`),
       line.note ? el("p", {}, line.note) : null);
     box.append(ev);
     box.scrollTop = box.scrollHeight;
@@ -153,22 +158,38 @@
     const m = /\$fromAI\('([^']+)',\s*'([^']*)'/.exec(expr || "");
     return m ? [m[1], m[2]] : null;
   }
+  const toolNames = () => Object.entries(state.wf.connections).filter(([, o]) => o.ai_tool).map(([name]) => name);
+  // The nodes a sub-workflow tool runs, in order, following the connections from its trigger.
+  function pipeline() {
+    const start = state.wf.nodes.find((n) => n.type.endsWith("executeWorkflowTrigger"));
+    const order = [];
+    const queue = start ? [start.name] : [];
+    while (queue.length) {
+      const name = queue.shift();
+      if (order.includes(name)) continue;
+      order.push(name);
+      for (const branch of state.wf.connections[name]?.main || []) for (const c of branch || []) queue.push(c.node);
+    }
+    return order.map((name) => state.wf.nodes.find((n) => n.name === name));
+  }
   function toolsView() {
     const wrap = el("div");
-    const tools = state.wf.nodes.filter((n) => n.parameters?.toolDescription);
-    for (const n of tools) {
+    for (const name of toolNames()) {
+      const n = state.wf.nodes.find((x) => x.name === name);
       const p = n.parameters;
-      const params = [];
-      for (const [col, v] of Object.entries(p.columns?.value || {})) {
+      const fields = p.workflowInputs?.value || p.columns?.value || {};
+      const table = el("table", {}, el("tr", {}, el("th", {}, "field"), el("th", {}, "the agent fills it from the call")));
+      for (const [col, v] of Object.entries(fields)) {
         const ai = fromAI(v);
-        params.push([col, ai ? `the agent fills it: ${ai[1]}` : `fixed: ${v.replace(/^=/, "")}`]);
+        table.append(el("tr", {}, el("td", {}, el("code", {}, col)), el("td", {}, ai ? ai[1] : `fixed: ${v.replace(/^=/, "")}`)));
       }
-      if (p.text) { const ai = fromAI(p.text); if (ai) params.push([ai[0], `the agent fills it: ${ai[1]}`]); }
-      if (p.chatId) params.push(["chatId", `fixed: ${p.chatId}`]);
-      const table = el("table", {}, el("tr", {}, el("th", {}, "field"), el("th", {}, "where it comes from")));
-      params.forEach(([a, b]) => table.append(el("tr", {}, el("td", {}, el("code", {}, a)), el("td", {}, b))));
-      wrap.append(el("div", { class: "tool" }, el("h3", {}, n.name), el("p", {}, `${n.type.replace("n8n-nodes-base.", "")} · "${p.toolDescription}"`), table));
+      wrap.append(el("div", { class: "tool" }, el("h3", {}, n.name), el("p", {}, `"${p.description || p.toolDescription}"`), table));
     }
+    const steps = el("ol", { class: "pipeline" });
+    for (const n of pipeline()) {
+      steps.append(el("li", {}, el("b", {}, n.name), el("span", {}, n.notes || "")));
+    }
+    wrap.append(el("div", { class: "tool" }, el("h3", {}, "What happens inside book_call"), el("p", {}, "Every step below is a node in workflow.json. The Code nodes are tested in CI against the failures from the real calls."), steps));
     return wrap;
   }
   function connectionView() {
@@ -267,9 +288,9 @@
     renderHood();
     renderBuild();
     renderStory();
-    const toolCount = wf.nodes.filter((n) => n.parameters?.toolDescription).length;
+    const toolCount = toolNames().length;
     const toolCalls = P.calls.flatMap((c) => c.lines).filter((l) => l.who === "tool").length;
-    for (const [v, k] of [[P.calls.length, "calls to replay"], [toolCount, "n8n tools over MCP"], [2, "languages"], [toolCalls, "real tool calls shown"]]) {
+    for (const [v, k] of [[P.calls.length, "real calls to replay"], [toolCount, "tool over MCP, does both steps"], [2, "languages"], [toolCalls, "real tool calls shown"]]) {
       $("stats").append(el("div", {}, el("dt", {}, k), el("dd", {}, String(v))));
     }
   }
