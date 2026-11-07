@@ -88,6 +88,9 @@
 .hood-body td, .hood-body th { text-align: left; padding: 7px 10px; border-top: 1px solid var(--border); vertical-align: top; }
 .hood-body th { font: 12px var(--mono); color: var(--dim); font-weight: 400; }
 .hood-body code { font: 13px var(--mono); }
+.pipeline { margin: 6px 0 0; padding-left: 22px; display: grid; gap: 8px; }
+.pipeline li b { font: 600 13.5px var(--mono); color: var(--text); margin-right: 8px; }
+.pipeline li span { color: var(--muted); font-size: 14px; }
 
 @media (max-width: 900px) {
   .sig-grid.cols3 { grid-template-columns: 1fr; }

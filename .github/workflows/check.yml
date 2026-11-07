@@ -1,4 +1,4 @@
-name: Check for secrets
+name: Check
 on:
   push:
   pull_request:
@@ -11,3 +11,4 @@ jobs:
         with:
           node-version: 22
       - run: node scripts/check-clean.mjs
+      - run: node scripts/test-book-call.mjs

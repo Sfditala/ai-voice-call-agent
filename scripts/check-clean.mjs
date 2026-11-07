@@ -33,15 +33,30 @@ for (const node of wf.nodes) {
     if (cred.id) problems.push(`${node.name}: ${type} credential id`);
   }
 }
-const tools = new Set(wf.nodes.filter((n) => n.parameters?.toolDescription).map((n) => n.name));
+const names = new Set(wf.nodes.map((n) => n.name));
+for (const [from, outs] of Object.entries(wf.connections)) {
+  if (!names.has(from)) problems.push(`connection from missing node "${from}"`);
+  for (const branch of Object.values(outs).flat()) for (const c of branch) if (!names.has(c.node)) problems.push(`connection to missing node "${c.node}"`);
+}
+for (const node of wf.nodes) {
+  const sheet = node.parameters?.sheetName;
+  if (sheet && sheet.mode !== "name") problems.push(`${node.name}: pick the sheet tab by name, a numeric tab id broke v1`);
+}
+// A tool is any node wired into the MCP Server Trigger.
+const tools = new Set(Object.entries(wf.connections).filter(([, o]) => o.ai_tool).map(([name]) => name));
 
 const sandbox = { window: {} };
 vm.runInNewContext(fs.readFileSync(path.join(root, "site/data.js"), "utf8"), sandbox);
-const archIds = new Set(sandbox.window.PROJECT.arch.map((a) => a.id));
-for (const call of sandbox.window.PROJECT.calls) {
+const P = sandbox.window.PROJECT;
+const archIds = new Set(P.arch.map((a) => a.id));
+const retired = P.retired || {};
+for (const t of tools) if (!archIds.has(t)) problems.push(`tool ${t} isn't on the diagram`);
+for (const [old, id] of Object.entries(retired)) if (!archIds.has(id)) problems.push(`retired tool ${old} maps to ${id}, which isn't on the diagram`);
+for (const call of P.calls) {
   for (const line of call.lines) {
-    if (line.who === "tool" && !tools.has(line.tool)) problems.push(`call "${call.label}" uses missing tool ${line.tool}`);
-    if (line.who === "tool" && !archIds.has(line.tool)) problems.push(`call "${call.label}": ${line.tool} isn't on the diagram`);
+    if (line.who !== "tool") continue;
+    if (!tools.has(line.tool) && !retired[line.tool]) problems.push(`call "${call.label}" uses unknown tool ${line.tool}`);
+    if (retired[line.tool] && call.version !== "v1") problems.push(`call "${call.label}" uses retired tool ${line.tool} but isn't marked v1`);
   }
 }
 

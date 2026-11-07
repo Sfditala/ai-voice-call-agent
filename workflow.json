@@ -1,115 +1,563 @@
 {
-  "name": "AI Voice Call Agent · tools",
+  "name": "AI Voice Call Agent · tools (v2)",
   "nodes": [
     {
       "parameters": {
         "authentication": "bearerAuth",
         "path": "voice-agent-tools",
-        "instructions": "Tools for Tala's voice assistant: save interested clients' contact details and notify Tala."
+        "instructions": "Tools for Tala's voice assistant. Call book_call once, after the caller confirms their details."
       },
       "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
       "typeVersion": 2.1,
-      "position": [0, 0],
-      "id": "a3f1c0de-0001-4c1a-9a01-voicecall0001",
+      "position": [
+        0,
+        0
+      ],
+      "id": "b00c0a11-0001-4c1a-9a02-voicecallv201",
       "name": "MCP Server Trigger",
       "credentials": {
         "httpBearerAuth": {
           "name": "Bearer Auth (shared with ElevenLabs)"
         }
-      }
+      },
+      "notes": "The agent's only door into n8n. Bearer token, same one as in ElevenLabs."
     },
     {
       "parameters": {
-        "descriptionType": "manual",
-        "toolDescription": "Save a client's lead (name, phone, email, what they need). Call this right after the client confirms their details. Do not ask for permission to save.",
+        "description": "Book a call with Tala. Saves the caller to the Leads sheet AND notifies Tala on Telegram, in one step. Call it once, right after the caller confirms their details. Do not ask permission first. The result tells you what to say to the caller.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $workflow.id }}"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "name": "={{ $fromAI('name', 'Caller full name, exactly as they confirmed it', 'string') }}",
+            "phone": "={{ $fromAI('phone', 'Caller phone number as digits, e.g. 0599123456. Digits only, never words', 'string') }}",
+            "email": "={{ $fromAI('email', 'Caller email in lowercase, or an empty string if they skipped it', 'string') }}",
+            "request": "={{ $fromAI('request', 'One short sentence: what the caller wants from Tala', 'string') }}",
+            "language": "={{ $fromAI('language', 'Language of the call: ar or en', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "request",
+              "displayName": "request",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "language",
+              "displayName": "language",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        220
+      ],
+      "id": "b00c0a11-0002-4c1a-9a02-voicecallv202",
+      "name": "book_call",
+      "notes": "One tool instead of two. The agent can't forget to notify Tala, because n8n does it every time."
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "name"
+            },
+            {
+              "name": "phone"
+            },
+            {
+              "name": "email"
+            },
+            {
+              "name": "request"
+            },
+            {
+              "name": "language"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -220,
+        560
+      ],
+      "id": "b00c0a11-0003-4c1a-9a02-voicecallv203",
+      "name": "When book_call runs",
+      "notes": "book_call runs this part of the same workflow."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turn what the agent heard into clean data. The agent sometimes passes a phone number\n// as words (\"zero five nine…\" or \"صفر خمسة تسعة…\") and spells emails out loud.\nconst input = $input.first().json;\nconst DIGITS = { \"٠\": 0, \"١\": 1, \"٢\": 2, \"٣\": 3, \"٤\": 4, \"٥\": 5, \"٦\": 6, \"٧\": 7, \"٨\": 8, \"٩\": 9, \"۰\": 0, \"۱\": 1, \"۲\": 2, \"۳\": 3, \"۴\": 4, \"۵\": 5, \"۶\": 6, \"۷\": 7, \"۸\": 8, \"۹\": 9 };\nconst WORDS = {\n  zero: 0, oh: 0, o: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,\n  \"صفر\": 0, \"زيرو\": 0, \"واحد\": 1, \"وحدة\": 1, \"اثنين\": 2, \"اتنين\": 2, \"إثنين\": 2, \"ثنين\": 2, \"اثنان\": 2,\n  \"ثلاثة\": 3, \"ثلاث\": 3, \"تلاتة\": 3, \"تلات\": 3, \"أربعة\": 4, \"اربعة\": 4, \"أربع\": 4, \"اربع\": 4,\n  \"خمسة\": 5, \"خمس\": 5, \"ستة\": 6, \"ست\": 6, \"سبعة\": 7, \"سبع\": 7,\n  \"ثمانية\": 8, \"تمانية\": 8, \"ثمان\": 8, \"تمن\": 8, \"تسعة\": 9, \"تسع\": 9,\n};\nconst REPEAT = { double: 2, triple: 3, \"دبل\": 2 };\n\nfunction toDigits(raw) {\n  let text = String(raw || \"\").replace(/[٠-٩۰-۹]/g, (d) => DIGITS[d]).toLowerCase();\n  const plus = /^\\s*(\\+|00)/.test(text) ? \"+\" : \"\";\n  let out = \"\";\n  let repeat = 1;\n  for (let token of text.split(/[\\s,.\\-–_()\\/،]+/)) {\n    if (!token) continue;\n    if (/^\\d+$/.test(token.replace(\"+\", \"\"))) { out += token.replace(\"+\", \"\"); repeat = 1; continue; }\n    if (token.length > 1 && token.startsWith(\"و\") && WORDS[token.slice(1)] !== undefined) token = token.slice(1);\n    if (REPEAT[token]) { repeat = REPEAT[token]; continue; }\n    if (WORDS[token] !== undefined) { out += String(WORDS[token]).repeat(repeat); repeat = 1; }\n  }\n  if (plus && out.startsWith(\"00\")) out = out.slice(2);\n  return plus + out;\n}\n\nfunction cleanEmail(raw) {\n  const e = String(raw || \"\").trim().toLowerCase()\n    .replace(/\\s+(at|ات)\\s+/g, \"@\").replace(/\\s+(dot|دوت|نقطة)\\s+/g, \".\")\n    .replace(/\\s+/g, \"\").replace(/\\.$/, \"\");\n  return e;\n}\n\nconst phone = toDigits(input.phone);\nconst local = phone.replace(\"+\", \"\");\nconst phoneOk = phone.startsWith(\"+\") ? local.length >= 10 && local.length <= 15 : local.length === 9 || local.length === 10;\nconst email = cleanEmail(input.email);\nconst emailOk = email === \"\" || /^[^@\\s]+@[^@\\s]+\\.[a-z]{2,}$/.test(email);\n\nreturn [{\n  json: {\n    date: $now.setZone(\"Asia/Hebron\").toFormat(\"yyyy-LL-dd HH:mm\"),\n    name: String(input.name || \"\").trim(),\n    phone,\n    phone_heard: String(input.phone || \"\").trim(),\n    phone_ok: phoneOk,\n    email,\n    email_ok: emailOk,\n    request: String(input.request || \"\").trim(),\n    language: input.language === \"en\" ? \"en\" : \"ar\",\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        560
+      ],
+      "id": "b00c0a11-0004-4c1a-9a02-voicecallv204",
+      "name": "Clean the lead",
+      "notes": "Phone spoken as words or Arabic digits becomes plain digits. Spelled-out email becomes an address. Both get checked."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b00c0a11-0020-4c1a-9a02-voicecallv220",
+              "leftValue": "={{ $json.phone_ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        560
+      ],
+      "id": "b00c0a11-0005-4c1a-9a02-voicecallv205",
+      "name": "Phone looks real?",
+      "notes": "9 or 10 digits, or an international number starting with +."
+    },
+    {
+      "parameters": {
         "operation": "append",
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "YOUR_GOOGLE_SHEET_ID",
-          "cachedResultName": "Leads"
+          "value": "YOUR_GOOGLE_SHEET_ID"
         },
         "sheetName": {
           "__rl": true,
-          "mode": "list",
-          "value": "YOUR_SHEET_TAB_GID",
-          "cachedResultName": "Leads"
+          "mode": "name",
+          "value": "Leads"
         },
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "name": "={{ $fromAI('name', 'Client full name', 'string') }}",
-            "phone": "={{ $fromAI('phone', 'Client phone number', 'string') }}",
-            "email": "={{ $fromAI('email', 'Client email address, or empty if not given', 'string') }}",
-            "request": "={{ $fromAI('request', 'What the client needs from Tala', 'string') }}",
-            "date": "={{ $now.toISO() }}"
+            "date": "={{ $json.date }}",
+            "name": "={{ $json.name }}",
+            "phone": "={{ $json.phone }}",
+            "email": "={{ $json.email }}",
+            "request": "={{ $json.request }}",
+            "language": "={{ $json.language }}",
+            "phone_heard": "={{ $json.phone_heard }}"
           },
+          "matchingColumns": [],
           "schema": [
-            { "id": "name", "displayName": "name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "phone", "displayName": "phone", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "request", "displayName": "request", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "date", "displayName": "date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "email", "displayName": "email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "request",
+              "displayName": "request",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "language",
+              "displayName": "language",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone_heard",
+              "displayName": "phone_heard",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
           ]
         },
         "options": {}
       },
-      "type": "n8n-nodes-base.googleSheetsTool",
+      "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
-      "position": [-128, 224],
-      "id": "a3f1c0de-0002-4c1a-9a01-voicecall0002",
-      "name": "save_lead",
+      "position": [
+        460,
+        460
+      ],
+      "id": "b00c0a11-0006-4c1a-9a02-voicecallv206",
+      "name": "Save to the Leads sheet",
       "credentials": {
         "googleSheetsOAuth2Api": {
           "name": "Google Sheets account"
         }
-      }
+      },
+      "onError": "continueErrorOutput",
+      "notes": "The tab is picked by its name, \"Leads\", not by a numeric id. That id is what broke v1."
     },
     {
       "parameters": {
-        "descriptionType": "manual",
-        "toolDescription": "Send Tala a short Telegram message about a new interested client",
+        "jsCode": "// The row is in the sheet.\nreturn [{ json: { ...$('Clean the lead').first().json, saved: true, save_error: \"\" } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        380
+      ],
+      "id": "b00c0a11-0007-4c1a-9a02-voicecallv207",
+      "name": "Saved",
+      "notes": "Sheet row written."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Google Sheets failed. Keep going: Tala still gets the lead on Telegram.\nconst err = $json.error;\nconst message = typeof err === \"string\" ? err : err?.message || \"unknown error\";\nreturn [{ json: { ...$('Clean the lead').first().json, saved: false, save_error: message } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        560
+      ],
+      "id": "b00c0a11-0008-4c1a-9a02-voicecallv208",
+      "name": "Not saved",
+      "notes": "Sheet failed. Carry the error forward instead of stopping."
+    },
+    {
+      "parameters": {
+        "jsCode": "// One message Tala can act on from her phone, with the save status in it.\nconst l = $input.first().json;\nconst heardDiffers = l.phone_heard && l.phone_heard.replace(/\\D/g, \"\") !== l.phone.replace(/\\D/g, \"\");\nconst lines = [\n  \"📞 New lead from the voice agent\",\n  \"\",\n  `👤 ${l.name || \"—\"}`,\n  `📱 ${l.phone}${heardDiffers ? `  (heard: ${l.phone_heard})` : \"\"}`,\n  `✉️ ${l.email || \"—\"}${l.email_ok ? \"\" : \"  ⚠️ looks wrong, check it\"}`,\n  `💬 ${l.request || \"—\"}`,\n  `🌐 ${l.language === \"en\" ? \"English\" : \"Arabic\"} · 🕒 ${l.date}`,\n  \"\",\n  l.saved ? \"✅ Saved to the Leads sheet\" : `⚠️ NOT saved to the sheet (${l.save_error}). Add it by hand.`,\n];\nreturn [{ json: { ...l, text: lines.join(\"\\n\") } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        460
+      ],
+      "id": "b00c0a11-0009-4c1a-9a02-voicecallv209",
+      "name": "Write the Telegram card",
+      "notes": "Same format every time, digits not words, and the save status at the bottom."
+    },
+    {
+      "parameters": {
         "chatId": "YOUR_TELEGRAM_CHAT_ID",
-        "text": "={{ $fromAI('message', 'Short summary for Tala: client name, phone and what they need', 'string') }}",
+        "text": "={{ $json.text }}",
         "additionalFields": {
           "appendAttribution": false
         }
       },
-      "type": "n8n-nodes-base.telegramTool",
+      "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [128, 224],
-      "id": "a3f1c0de-0003-4c1a-9a01-voicecall0003",
-      "name": "notify_tala",
+      "position": [
+        1160,
+        460
+      ],
+      "id": "b00c0a11-0010-4c1a-9a02-voicecallv210",
+      "name": "Tell Tala on Telegram",
       "credentials": {
         "telegramApi": {
           "name": "Telegram bot"
         }
-      }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Runs whether or not the sheet worked."
     },
     {
       "parameters": {
-        "content": "## ملاحظات البناء\n\nالمكالمة نفسها (الصوت، فهم الكلام، الـ LLM، الـ knowledge base) كلها جوا ElevenLabs.\nهاد الـ workflow هو بس \"الإيدين\" تبع الـ agent: أدوات بيستدعيها عن طريق MCP.\n\n- save_lead بيسجل العميل بـ Google Sheets\n- notify_tala بيبعتلي ملخص على تلغرام\n- الحماية بـ Bearer token، نفس الـ token محطوط كـ header بـ ElevenLabs\n\nإذا بدي أضيف قدرة جديدة (حجز بالتقويم، CRM)، بضيف tool node هون وبس، وما بلمس الصوت.",
+        "jsCode": "// What book_call returns to the agent. It tells the agent exactly what it may promise.\nconst lead = $('Write the Telegram card').first().json;\nconst notified = !$json.error;\nconst reached = lead.saved || notified;\nreturn [{\n  json: {\n    saved: lead.saved,\n    notified_tala: notified,\n    phone: lead.phone,\n    say_to_caller: reached\n      ? \"Tell the caller their details reached Tala and she will contact them soon.\"\n      : \"Apologise: a technical problem stopped the details from reaching Tala. Ask them to call again later. Do not promise that Tala will contact them.\",\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        460
+      ],
+      "id": "b00c0a11-0011-4c1a-9a02-voicecallv211",
+      "name": "Answer the agent",
+      "notes": "Returns saved / notified_tala and the exact line the agent may say."
+    },
+    {
+      "parameters": {
+        "jsCode": "// The number is too short or too long to be real. Nothing is saved; the agent asks again.\nconst l = $input.first().json;\nconst n = l.phone.replace(\"+\", \"\").length;\nreturn [{\n  json: {\n    saved: false,\n    notified_tala: false,\n    phone_heard: l.phone_heard,\n    say_to_caller: `The phone number came through as \"${l.phone || \"nothing\"}\" (${n} digits), which is not a complete number. Ask the caller to repeat it digit by digit, read it back, then call book_call again. Nothing was saved yet.`,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        720
+      ],
+      "id": "b00c0a11-0012-4c1a-9a02-voicecallv212",
+      "name": "Ask for the number again",
+      "notes": "Nothing saved. The agent asks the caller to repeat the number."
+    },
+    {
+      "parameters": {
+        "content": "## The tools the agent sees\n\nElevenLabs runs the call. This top part is what it can reach over MCP: one tool, **book_call**.\n\nv1 had two tools (save_lead + notify_tala) and left it to the model to call both. In real test calls it once skipped Telegram after the sheet failed, and the lead was lost. Now n8n does both, every time.",
+        "height": 300,
+        "width": 440,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        260,
+        -60
+      ],
+      "id": "b00c0a11-0013-4c1a-9a02-voicecallv213",
+      "name": "Note: tools"
+    },
+    {
+      "parameters": {
+        "content": "## What book_call does\n\n1. Clean the phone and email (words → digits)\n2. Number too short? Ask again, save nothing\n3. Save to the sheet. If it fails, keep going\n4. Telegram card with the save status\n5. Tell the agent exactly what it may promise",
+        "height": 260,
+        "width": 400,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -260,
+        240
+      ],
+      "id": "b00c0a11-0014-4c1a-9a02-voicecallv214",
+      "name": "Note: book_call"
+    },
+    {
+      "parameters": {
+        "content": "## ملاحظات البناء\n\nالمكالمة كلها جوا ElevenLabs. هاد الـ workflow هو \"الإيدين\".\n\n- أداة وحدة book_call بتحفظ بالشيت وبتبعتلي على تلغرام مع بعض\n- إذا الشيت فشل، التلغرام بيوصل برضه ومكتوب فيه إنه ما انحفظ\n- الرقم بيوصل أرقام مش كلمات\n- إذا الرقم ناقص، بيرجع للـ agent يطلبه مرة ثانية\n\nبدي أضيف قدرة جديدة (تقويم، CRM)؟ بضيف tool node تحت الـ MCP Server Trigger وبس.",
         "height": 340,
         "width": 420,
         "color": 7
       },
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [320, -80],
-      "id": "a3f1c0de-0004-4c1a-9a01-voicecall0004",
+      "position": [
+        1160,
+        -60
+      ],
+      "id": "b00c0a11-0015-4c1a-9a02-voicecallv215",
       "name": "Build notes"
     }
   ],
   "connections": {
-    "save_lead": {
-      "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+    "book_call": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "notify_tala": {
-      "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+    "When book_call runs": {
+      "main": [
+        [
+          {
+            "node": "Clean the lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean the lead": {
+      "main": [
+        [
+          {
+            "node": "Phone looks real?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phone looks real?": {
+      "main": [
+        [
+          {
+            "node": "Save to the Leads sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask for the number again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to the Leads sheet": {
+      "main": [
+        [
+          {
+            "node": "Saved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Saved": {
+      "main": [
+        [
+          {
+            "node": "Write the Telegram card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Not saved": {
+      "main": [
+        [
+          {
+            "node": "Write the Telegram card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write the Telegram card": {
+      "main": [
+        [
+          {
+            "node": "Tell Tala on Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tell Tala on Telegram": {
+      "main": [
+        [
+          {
+            "node": "Answer the agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "timezone": "Asia/Hebron",
+    "callerPolicy": "workflowsFromSameOwner"
   },
   "meta": {
     "templateCredsSetupCompleted": false
