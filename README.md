@@ -63,6 +63,31 @@ flowchart LR
 
 </details>
 
+## How I built it, step by step
+
+**In n8n: the agent's hands**
+
+1. **Started with the tools, not the voice.** An empty workflow with an **MCP Server Trigger**. Anything the agent should do during a call becomes a tool under this trigger.
+2. **Locked the door.** The MCP URL is public, so the trigger uses **Bearer Auth** with a long random token.
+3. **Added two tools.** `save_lead` appends a row to Google Sheets, and `notify_tala` sends me a Telegram message. Every field the caller provides uses `$fromAI`, so the agent fills it from the conversation, and each tool's description tells the agent when to use it.
+
+**In ElevenLabs: the voice and the brain**
+
+4. **Created the agent.** A system prompt, a greeting in Arabic and English, Arabic as the default with English detected automatically, and a voice that handles both.
+5. **Taught it about me.** My CV and portfolio site went into the Knowledge Base, with the rule that matters most: answer only from these, never guess.
+
+**Connecting the two**
+
+6. **Added n8n as an MCP server.** Tools → MCP → Add custom server, **Streamable HTTP**, the n8n **Production URL**, and the header `Authorization: Bearer <token>`. The first test said "Failed to connect", because the workflow wasn't active yet. After publishing, both tools appeared.
+7. **Attached it to the agent.** Adding the server to the workspace isn't enough. It has to be attached to the agent itself.
+
+**Testing, and breaking it on purpose**
+
+8. **First call invented my career** ("a digital marketer"). Fixed with the CV in the prompt, Gemini 3.5 Flash, multilingual embeddings and a stricter no-guessing rule.
+9. **It asked permission to save, heard "no", and saved nothing.** Now it collects, reads back once, saves, and promises a follow-up only after the save succeeds.
+10. **"Sheet with ID 0 not found."** Found the real tab id through n8n. During that failure the agent still notified me on Telegram and was honest with the caller.
+11. **A script of trap questions:** prices, free slots, rumours, corrected details mid-booking, a caller who won't leave details, and switching language mid-call. Each fix was checked against the ElevenLabs call logs and n8n's executions.
+
 ## Run it yourself
 
 1. In n8n, go to **Workflows → Import from File** and choose [`workflow.json`](workflow.json).
@@ -80,7 +105,7 @@ This repo contains no credentials, tokens, agent IDs or real sheet and chat IDs.
 
 مساعد صوتي بتقدر تتصل فيه. بيجاوب عن تالا وشغلها من الـ CV بالعربي أو الإنجليزي، وما بيخمّن أي معلومة، وإذا المتصل مهتم بياخد اسمه ورقمه وشو بده، وبيسجله بـ Google Sheets وبيبعتلي ملخص على تلغرام.
 
-المكالمة نفسها (الصوت، فهم الكلام، الموديل، المعلومات) كلها بـ ElevenLabs، والأفعال (التسجيل والإشعار) بـ n8n عن طريق MCP. بصفحة المشروع بتقدر تعيد تشغيل مكالمات تجريبية حقيقية وتشوف كل أداة وهي بتشتغل.
+بلّشت من n8n: عملت MCP Server Trigger محمي بـ Bearer token، وتحته أداتين، وحدة بتسجّل العميل بالشيت ووحدة بتبعتلي على تلغرام. بعدين بنيت الـ agent بـ ElevenLabs: البرومبت، والترحيب بالعربي والإنجليزي، والـ CV بالـ Knowledge Base. وبالآخر ربطتهم عن طريق MCP بالرابط والـ token. أول مكالمة اخترع فيها إني مسوقة رقمية 😅، وبعد التصليحات صار يجاوب من الـ CV بس، وبيقول "مش متأكد" بدل ما يخمّن. بصفحة المشروع بتقدر تعيد تشغيل مكالمات تجريبية حقيقية وتشوف كل أداة وهي بتشتغل.
 
 </div>
 

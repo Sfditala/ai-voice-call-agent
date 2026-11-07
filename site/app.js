@@ -218,6 +218,18 @@
     open(0);
   }
 
+  /* ---------- the build ---------- */
+  function renderBuild() {
+    const box = $("timeline");
+    P.build.forEach((s, i) => {
+      const where = s.where.toLowerCase().replace(/[^a-z0-9]/g, "");
+      box.append(el("li", { class: `tl ${where}` },
+        el("div", { class: "tl-head" }, el("span", { class: "tl-n" }, String(i + 1).padStart(2, "0")), el("span", { class: "tl-where" }, s.where)),
+        el("b", {}, s.title),
+        el("p", {}, s.text)));
+    });
+  }
+
   /* ---------- story ---------- */
   function renderStory() {
     const story = $("story");
@@ -253,6 +265,7 @@
     $("step").onclick = () => { stop(); step(); stop(); };
     $("restart").onclick = () => pick(P.calls.indexOf(state.call), false);
     renderHood();
+    renderBuild();
     renderStory();
     const toolCount = wf.nodes.filter((n) => n.parameters?.toolDescription).length;
     const toolCalls = P.calls.flatMap((c) => c.lines).filter((l) => l.who === "tool").length;

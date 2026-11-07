@@ -38,6 +38,19 @@ window.PROJECT = {
     "In ElevenLabs, create an agent and copy the prompt and settings from agent/elevenlabs-agent.json. Add your CV in prompt mode.",
     "Add a custom MCP server: Streamable HTTP, the Production URL, and an Authorization header of Bearer YOUR_SHARED_TOKEN. Attach it to the agent, then test."
   ],
+  "build": [
+    { "where": "n8n", "title": "Start with the tools, not the voice", "text": "I created an empty workflow with an MCP Server Trigger. This is the agent's hands: anything I want it to do during a call becomes a tool under this trigger." },
+    { "where": "n8n", "title": "Lock the door", "text": "The MCP URL is public, so I set the trigger's authentication to Bearer Auth and generated a long random token for it." },
+    { "where": "n8n", "title": "Give it two tools", "text": "save_lead appends a row to Google Sheets, and notify_tala sends me a Telegram message. Each field the caller provides uses $fromAI, so the agent fills it from the conversation, and each tool has a description that tells the agent when to use it." },
+    { "where": "ElevenLabs", "title": "Create the agent", "text": "A blank agent with a system prompt, a greeting in Arabic and English, Arabic as the default language with English detected automatically, and a voice that handles both." },
+    { "where": "ElevenLabs", "title": "Teach it about me", "text": "I added my CV and my portfolio site to the Knowledge Base, and wrote the rule that matters most: answer only from these, and never guess." },
+    { "where": "Both", "title": "Connect them over MCP", "text": "In ElevenLabs: Tools → MCP → Add custom server, Streamable HTTP, the n8n Production URL, and the header Authorization: Bearer <token>. The first test failed with \"Failed to connect\": the workflow wasn't active. After I published it, both tools showed up." },
+    { "where": "ElevenLabs", "title": "Attach the server to the agent", "text": "Adding the server to the workspace isn't enough. It has to be attached to the agent itself, or the agent never sees the tools." },
+    { "where": "Testing", "title": "First call: it invented my career", "text": "\"Who is Tala?\" got \"a digital marketer\". I put the CV straight into the prompt, switched the model to Gemini 3.5 Flash, used multilingual embeddings, and made the no-guessing rule stricter." },
+    { "where": "Testing", "title": "It asked permission, and saved nothing", "text": "It asked \"Do you want me to save your details?\" and took \"no\" for an answer. Now it collects, reads back once, saves without asking, and only promises a follow-up after the save succeeds." },
+    { "where": "Testing", "title": "The sheet that wasn't there", "text": "save_lead failed with \"Sheet with ID 0 not found\". I found the real tab id through n8n and fixed it. Even during that failure, the agent still notified me on Telegram and was honest with the caller." },
+    { "where": "Testing", "title": "Break it on purpose", "text": "I wrote a script of trap questions: prices, free slots, rumours, wrong details mid-booking, a caller who refuses to leave details, and switching language mid-call. Every fix was checked against the call logs and n8n's executions." }
+  ],
   "arch": [
     { "id": "caller", "label": "Caller", "sub": "browser or phone", "kind": "trigger" },
     { "id": "voice", "label": "ElevenLabs voice", "sub": "speech ↔ text", "kind": "output" },

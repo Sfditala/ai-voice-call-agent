@@ -101,3 +101,17 @@
   .avatar.talking span, .bubble, .toolpill, .fixnote, .ev { animation: none; }
 }
 .transcript .hint { margin: auto; color: var(--dim); font-size: 14px; }
+
+.build { padding: 48px 0 0; }
+.build h2 { font-size: clamp(26px, 4vw, 38px); letter-spacing: -.02em; line-height: 1.15; margin: 0 0 8px; }
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; counter-reset: none; }
+.tl { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; border-top: 3px solid var(--c, var(--accent)); }
+.tl.n8n { --c: #ff9f5a; }
+.tl.elevenlabs { --c: #e6e6e6; }
+.tl.both { --c: #2dd4bf; }
+.tl.testing { --c: #ef5a66; }
+.tl-head { display: flex; justify-content: space-between; font: 12px var(--mono); color: var(--dim); margin-bottom: 6px; }
+.tl-n { color: var(--c); font-weight: 600; }
+.tl b { display: block; font-size: 16.5px; margin-bottom: 4px; }
+.tl p { margin: 0; color: var(--muted); font-size: 14.5px; }
+@media (max-width: 900px) { .timeline { grid-template-columns: 1fr; } }
