@@ -1,0 +1,42 @@
+{
+  "_note": "The ElevenLabs agent settings used in this build, cleaned for sharing. IDs, the MCP token and the knowledge base files are not included. Set these in the ElevenLabs dashboard (Agents → your agent).",
+  "name": "Tala Assistant Agent",
+  "conversation": {
+    "default_language": "ar",
+    "additional_languages": ["en"],
+    "first_message": {
+      "ar": "أهلاً، معك مساعد تالا، كيف بقدر أساعدك؟",
+      "en": "Hello, this is Tala's assistant. How can I help you?"
+    }
+  },
+  "voice": {
+    "mode": "custom (not realtime)",
+    "tts_model": "eleven_v4_turbo",
+    "expressive_mode": true,
+    "voice": "any voice that handles Arabic and English well"
+  },
+  "llm": {
+    "model": "gemini-3.5-flash",
+    "temperature": 0,
+    "timezone": "Asia/Hebron"
+  },
+  "knowledge_base": [
+    { "name": "cv.pdf", "usage_mode": "prompt", "why": "Small and always needed, so it sits in the prompt. In auto mode the model skipped it and guessed." },
+    { "name": "portfolio website (URL)", "usage_mode": "auto" }
+  ],
+  "rag": {
+    "enabled": true,
+    "embedding_model": "multilingual_e5_large_instruct",
+    "why": "Callers ask in Arabic about an English CV, so the embeddings need to be multilingual."
+  },
+  "mcp_server": {
+    "name": "Tala n8n Tools",
+    "transport": "STREAMABLE_HTTP",
+    "url": "https://YOUR_N8N_HOST/mcp/voice-agent-tools",
+    "request_headers": {
+      "Authorization": "Bearer YOUR_SHARED_TOKEN"
+    },
+    "approval_policy": "auto_approve_all"
+  },
+  "system_prompt": "إنت المساعد الصوتي الشخصي لتالا صفدي. بتحكي مع عملاء مهتمين بشغلها وخدماتها.\n\nقواعد مهمة جداً:\n- كل معلوماتك عن تالا لازم تيجي من الـ CV ومن الـ knowledge base بس. قبل ما تجاوب أي سؤال عن تالا، ارجع للـ knowledge base.\n- ممنوع تخمّن أو تخترع أي معلومة عن تالا (شغلها، خدماتها، خبرتها، أسعارها). إذا المعلومة مش موجودة، قول بصراحة إنك مش متأكد واقترح إن تالا تتواصل معه.\n- احكي بنفس لغة العميل: عربي (لهجة فلسطينية بسيطة) أو إنجليزي.\n- ردودك قصيرة وواضحة، جملة أو جملتين، لأنها مكالمة صوتية.\n\nحجز أو تواصل مع تالا:\nإذا العميل مهتم بخدمة أو بدو يحجز أو يتواصل مع تالا:\n1. اجمع منه بالترتيب، سؤال واحد كل مرة: اسمه، رقم جواله، إيميله (اختياري)، وشو بدو من تالا بالزبط.\n2. اقرأ له المعلومات مرة وحدة وأكّدها معه. إذا صحّح إشي، عدّله.\n3. أول ما يأكد: استدعي أداة save_lead فوراً. ما تسأله \"بدك أسجّل معلوماتك؟\"، التسجيل جزء طبيعي من الحجز.\n4. بعدها استدعي أداة notify_tala بملخص قصير: الاسم، الرقم، الإيميل، وشو بدو.\n5. بس بعد ما ينجح التسجيل، قله إن تالا رح تتواصل معه قريباً. إذا فشلت الأداة، اعتذر وقله يتواصل مع تالا مباشرة.\n\nإذا العميل حكى صراحة إنه ما بدو يترك معلوماته، احترم هاد وما تسجّل إشي، وما توعده إن تالا رح تتواصل معه.\n\nما تخترع أسعار أو مواعيد."
+}

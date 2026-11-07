@@ -1,0 +1,117 @@
+{
+  "name": "AI Voice Call Agent · tools",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "bearerAuth",
+        "path": "voice-agent-tools",
+        "instructions": "Tools for Tala's voice assistant: save interested clients' contact details and notify Tala."
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "a3f1c0de-0001-4c1a-9a01-voicecall0001",
+      "name": "MCP Server Trigger",
+      "credentials": {
+        "httpBearerAuth": {
+          "name": "Bearer Auth (shared with ElevenLabs)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Save a client's lead (name, phone, email, what they need). Call this right after the client confirms their details. Do not ask for permission to save.",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "cachedResultName": "Leads"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SHEET_TAB_GID",
+          "cachedResultName": "Leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "name": "={{ $fromAI('name', 'Client full name', 'string') }}",
+            "phone": "={{ $fromAI('phone', 'Client phone number', 'string') }}",
+            "email": "={{ $fromAI('email', 'Client email address, or empty if not given', 'string') }}",
+            "request": "={{ $fromAI('request', 'What the client needs from Tala', 'string') }}",
+            "date": "={{ $now.toISO() }}"
+          },
+          "schema": [
+            { "id": "name", "displayName": "name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "phone", "displayName": "phone", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "request", "displayName": "request", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "date", "displayName": "date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "email", "displayName": "email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [-128, 224],
+      "id": "a3f1c0de-0002-4c1a-9a01-voicecall0002",
+      "name": "save_lead",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Send Tala a short Telegram message about a new interested client",
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $fromAI('message', 'Short summary for Tala: client name, phone and what they need', 'string') }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegramTool",
+      "typeVersion": 1.2,
+      "position": [128, 224],
+      "id": "a3f1c0de-0003-4c1a-9a01-voicecall0003",
+      "name": "notify_tala",
+      "credentials": {
+        "telegramApi": {
+          "name": "Telegram bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## ملاحظات البناء\n\nالمكالمة نفسها (الصوت، فهم الكلام، الـ LLM، الـ knowledge base) كلها جوا ElevenLabs.\nهاد الـ workflow هو بس \"الإيدين\" تبع الـ agent: أدوات بيستدعيها عن طريق MCP.\n\n- save_lead بيسجل العميل بـ Google Sheets\n- notify_tala بيبعتلي ملخص على تلغرام\n- الحماية بـ Bearer token، نفس الـ token محطوط كـ header بـ ElevenLabs\n\nإذا بدي أضيف قدرة جديدة (حجز بالتقويم، CRM)، بضيف tool node هون وبس، وما بلمس الصوت.",
+        "height": 340,
+        "width": 420,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [320, -80],
+      "id": "a3f1c0de-0004-4c1a-9a01-voicecall0004",
+      "name": "Build notes"
+    }
+  ],
+  "connections": {
+    "save_lead": {
+      "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+    },
+    "notify_tala": {
+      "ai_tool": [[{ "node": "MCP Server Trigger", "type": "ai_tool", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
