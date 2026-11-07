@@ -113,7 +113,7 @@ flowchart LR
 ## Run it yourself
 
 1. In n8n, go to **Workflows → Import from File**, choose [`workflow.json`](workflow.json), and **save it once**. `book_call` calls this same workflow, so it needs a saved id.
-2. Create a Google Sheet with a tab named **Leads** and the columns `date`, `name`, `phone`, `email`, `request`, `language`, `phone_heard`. Replace `YOUR_GOOGLE_SHEET_ID` in **Save to the Leads sheet**.
+2. Create a Google Sheet with a tab named **Leads** and the columns `date`, `name`, `phone`, `email`, `request`. Replace `YOUR_GOOGLE_SHEET_ID` in **Save to the Leads sheet**.
 3. Replace `YOUR_TELEGRAM_CHAT_ID` in **Tell Tala on Telegram**, and press **Start** on your bot once so it can message you.
 4. Create a **Bearer Auth** credential with a long random token. Publish the workflow and copy the MCP **Production URL**.
 5. In ElevenLabs, create an agent and copy the prompt, speech keywords and post-call analysis from [`agent/elevenlabs-agent.json`](agent/elevenlabs-agent.json). Add your CV in **prompt** mode.

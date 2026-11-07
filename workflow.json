@@ -207,9 +207,7 @@
             "name": "={{ $json.name }}",
             "phone": "={{ $json.phone }}",
             "email": "={{ $json.email }}",
-            "request": "={{ $json.request }}",
-            "language": "={{ $json.language }}",
-            "phone_heard": "={{ $json.phone_heard }}"
+            "request": "={{ $json.request }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -252,24 +250,6 @@
             {
               "id": "request",
               "displayName": "request",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "language",
-              "displayName": "language",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "phone_heard",
-              "displayName": "phone_heard",
               "required": false,
               "defaultMatch": false,
               "display": true,
